@@ -57,6 +57,29 @@
     tfoot th,tfoot td { background:#eaf0f5; font-weight:700 }
     .small { font-size:12px; color:#637282 }
     .muted { color:#637282 }
+    .cal-wrap { position:relative }
+    .cal-btn { display:flex; align-items:center; width:100%; min-width:0; min-height:42px; padding:8px 12px; background:#fff; color:var(--ink); border:1px solid #b9c7d5; border-radius:7px; font-weight:400; text-align:left; cursor:pointer }
+    .cal-btn:hover { background:#fff; border-color:var(--blue) }
+    .cal-btn[aria-expanded=true] { border-color:var(--navy); box-shadow:0 0 0 3px #2563a633 }
+    .cal { position:absolute; z-index:20; top:calc(100% + 6px); left:0; width:min(320px,86vw); background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 28px #162e4420; padding:12px }
+    .cal[hidden] { display:none }
+    .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:var(--navy) }
+    .cal .cal-nav { width:36px; min-width:36px; min-height:36px; padding:0; background:#fff; color:var(--navy); border:1px solid var(--line); border-radius:8px; font-size:18px; line-height:1 }
+    .cal .cal-nav:hover { background:var(--pale) }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center }
+    .cal-dow { font-size:12px; font-weight:700; color:#5c6b79; padding:4px 0 }
+    .cal-dow.sun { color:#9aa7b4 }
+    .cal .cal-day { width:100%; min-width:0; min-height:36px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--ink); font-weight:400; cursor:pointer }
+    .cal .cal-day:hover { background:var(--pale) }
+    .cal .cal-day.sun { color:#9aa7b4 }
+    .cal .cal-day.in-week { background:#eef5fc; color:var(--navy) }
+    .cal .cal-day.today { box-shadow:inset 0 0 0 2px var(--blue) }
+    .cal .cal-day.sel { background:var(--blue); color:#fff; font-weight:700; box-shadow:none }
+    .cal .cal-day.sel:hover { background:#184d82 }
+    .cal button:focus-visible { outline:3px solid var(--yellow); outline-offset:1px }
+    .cal-foot { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:13px; color:#5c6b79 }
+    .cal .cal-link { min-width:0; min-height:0; width:auto; padding:4px 8px; background:transparent; color:var(--blue); border:0; font-weight:700 }
+    .cal .cal-link:hover { background:var(--pale) }
     @media(max-width:800px) { .entry-grid { grid-template-columns:1fr 1fr } .entry-grid .btn-row,.entry-grid > div:has(> button) { grid-column:span 2 } .entry-grid button { width:100% } main { margin-top:16px } .card { padding:16px } }
     @media(max-width:480px) { .entry-grid { grid-template-columns:1fr } .span-2,.entry-grid .btn-row,.entry-grid > div:has(> button) { grid-column:auto } header h1 { font-size:21px } }
     @media print { body { background:#fff } header { padding:12px 0; color:#111; background:#fff; border-bottom:2px solid #111 } header p { color:#333 } main { max-width:none; margin:12px 0; padding:0 } .entry-card,.no-print { display:none } .card { box-shadow:none; border:0; padding:0 } .table-wrap { overflow:visible; border:0 } table { min-width:0; font-size:10px } th,td { padding:5px } }
@@ -70,7 +93,7 @@
     <div id="alert" hidden></div>
 
     <form id="load-form" class="entry-grid" autocomplete="off">
-      <div><label for="date">Date</label><input type="date" id="date" name="date" required></div>
+      <div class="cal-wrap"><label id="date-label">Date</label><button type="button" class="cal-btn" id="date-btn" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="date-label date-btn"><span id="date-text"></span></button><div class="cal" id="cal" role="dialog" aria-label="Choose a date" hidden></div><input type="hidden" id="date" name="date"></div>
       <div>
         <label id="department-label">User / department</label>
         <details class="dd" id="department-dd">
@@ -281,13 +304,116 @@
     });
   }
 
+  // Monday of the week containing `ymd`.
+  function mondayOf(ymd) {
+    var d = utcDate(ymd);
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function addDays(ymd, n) {
+    var d = utcDate(ymd);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setDate(ymd, reload) {
+    state.date = ymd;
+    state.calMonth = ymd.slice(0, 7);
+    $('date').value = ymd;
+    $('date-text').textContent = dmy(ymd) + ' · ' + weekday(ymd, 'long');
+    if (reload) loadEntry();
+  }
+
+  function openCal(open) {
+    $('cal').hidden = !open;
+    $('date-btn').setAttribute('aria-expanded', String(open));
+    if (open) renderCalendar();
+  }
+
+  function renderCalendar() {
+    var ym = state.calMonth;
+    var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+    var daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // Monday-first offset
+    var monthName = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    var weekStart = mondayOf(state.date);
+    var weekEnd = addDays(weekStart, 5);
+    var today = todayInSingapore();
+
+    var html = '<div class="cal-head"><button type="button" class="cal-nav" data-nav="-1" aria-label="Previous month">&lsaquo;</button>' +
+      '<strong>' + esc(monthName) + '</strong>' +
+      '<button type="button" class="cal-nav" data-nav="1" aria-label="Next month">&rsaquo;</button></div>';
+
+    html += '<div class="cal-grid">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (name, i) {
+      return '<span class="cal-dow' + (i === 6 ? ' sun' : '') + '">' + name + '</span>';
+    }).join('') + '</div>';
+
+    html += '<div class="cal-grid">';
+    for (var blank = 0; blank < lead; blank++) html += '<span></span>';
+    for (var day = 1; day <= daysInMonth; day++) {
+      var ymd = ym + '-' + String(day).padStart(2, '0');
+      var dow = (lead + day - 1) % 7; // 0 = Monday ... 6 = Sunday
+      var cls = ['cal-day'];
+      if (dow === 6) cls.push('sun');
+      if (ymd >= weekStart && ymd <= weekEnd) cls.push('in-week');
+      if (ymd === today) cls.push('today');
+      if (ymd === state.date) cls.push('sel');
+      html += '<button type="button" class="' + cls.join(' ') + '" data-date="' + ymd + '"' +
+        (ymd === state.date ? ' aria-current="date"' : '') +
+        ' aria-label="' + esc(weekday(ymd, 'long') + ' ' + longDate(ymd)) + '">' + day + '</button>';
+    }
+    html += '</div>';
+
+    html += '<div class="cal-foot"><span>Report week: ' + esc(shortDate(weekStart) + ' – ' + shortDate(weekEnd)) +
+      '</span><button type="button" class="cal-link" data-today="1">Today</button></div>';
+    $('cal').innerHTML = html;
+  }
+
+  function bindCalendar() {
+    $('date-btn').addEventListener('click', function () { openCal($('cal').hidden); });
+    $('cal').addEventListener('click', function (event) {
+      var nav = event.target.closest('[data-nav]');
+      if (nav) {
+        var parts = state.calMonth.split('-');
+        var moved = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1 + Number(nav.getAttribute('data-nav')), 1));
+        state.calMonth = moved.toISOString().slice(0, 7);
+        renderCalendar();
+        return;
+      }
+      if (event.target.closest('[data-today]')) {
+        setDate(todayInSingapore(), false);
+        openCal(false);
+        $('date-btn').focus();
+        loadEntry();
+        return;
+      }
+      var day = event.target.closest('[data-date]');
+      if (day) {
+        setDate(day.getAttribute('data-date'), false);
+        openCal(false);
+        $('date-btn').focus();
+        loadEntry();
+      }
+    });
+    document.addEventListener('click', function (event) {
+      if (!$('cal').hidden && !event.target.closest('.cal-wrap')) openCal(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !$('cal').hidden) {
+        openCal(false);
+        $('date-btn').focus();
+      }
+    });
+  }
+
   function init() {
     var params = new URLSearchParams(location.search);
     var requested = params.get('date');
     state.date = /^\d{4}-\d{2}-\d{2}$/.test(requested || '') ? requested : todayInSingapore();
     if (DEPARTMENTS.indexOf(params.get('department')) !== -1) state.department = params.get('department');
 
-    $('date').value = state.date;
+    setDate(state.date, false);
     renderDepartments();
     setupDepartmentDropdown();
 
@@ -297,10 +423,10 @@
       loadEntry();
     });
     $('today-btn').addEventListener('click', function () {
-      state.date = todayInSingapore();
-      $('date').value = state.date;
+      setDate(todayInSingapore(), false);
       loadEntry();
     });
+    bindCalendar();
     $('save-form').addEventListener('submit', saveEntry);
     $('print-btn').addEventListener('click', function () { window.print(); });
 
