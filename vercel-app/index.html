@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Inward Count Tracker</title>
+  <style>
+    :root { color-scheme: light; --navy:#17324d; --blue:#2563a6; --pale:#eef5fc; --line:#d7e0e9; --ink:#1d2935; --yellow:#ffea00; }
+    * { box-sizing:border-box }
+    body { margin:0; background:#f3f6f9; color:var(--ink); font:15px/1.45 Arial,Helvetica,sans-serif }
+    header { background:var(--navy); color:#fff; padding:25px max(20px,calc((100% - 1200px)/2)) }
+    header h1 { margin:0 0 5px; font-size:24px } header p { margin:0; color:#d7e7f5 }
+    main { max-width:1200px; margin:25px auto; padding:0 16px 40px }
+    .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 3px 12px #162e4410 }
+    h2 { color:var(--navy); font-size:19px; margin:0 0 16px }
+    .entry-grid { display:grid; grid-template-columns:1.1fr 1fr 1fr 1fr auto; gap:14px; align-items:end }
+    .entry-grid + .entry-grid { margin-top:15px }
+    label { display:block; font-weight:700; margin-bottom:6px }
+    input,button { font:inherit; min-height:42px; border:1px solid #b9c7d5; border-radius:7px; padding:8px 10px; width:100%; background:#fff; color:var(--ink) }
+    button { width:auto; min-width:110px; background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700; cursor:pointer }
+    button:hover { background:#184d82 }
+    button:disabled { opacity:.6; cursor:wait }
+    input:focus-visible,button:focus-visible,.btn-secondary:focus-visible,.dd summary:focus-visible { outline:3px solid var(--yellow); outline-offset:2px; border-color:var(--navy) }
+    .btn-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .btn-secondary { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:8px 14px; border:1px solid var(--blue); border-radius:7px; background:#fff; color:var(--blue); font-weight:700; text-decoration:none; cursor:pointer }
+    .btn-secondary:hover { background:var(--pale) }
+    .span-2 { grid-column:span 2 }
+    .summary { background:var(--pale); border:1px solid var(--line); border-radius:7px; padding:10px 12px; font-weight:700; color:var(--navy); min-height:42px; display:flex; align-items:center }
+    .dd { position:relative }
+    .dd summary { list-style:none; position:relative; display:flex; align-items:center; min-height:42px; padding:8px 40px 8px 12px; border:1px solid #b9c7d5; border-radius:7px; background:#fff; color:var(--ink); cursor:pointer; user-select:none }
+    .dd summary::-webkit-details-marker { display:none }
+    .dd summary:hover { border-color:var(--blue) }
+    .dd[open] summary { border-color:var(--navy); box-shadow:0 0 0 3px #2563a633 }
+    .dd summary::after { content:""; position:absolute; right:16px; top:50%; width:8px; height:8px; border-right:2px solid var(--navy); border-bottom:2px solid var(--navy); transform:translateY(-70%) rotate(45deg); transition:transform .15s }
+    .dd[open] summary::after { transform:translateY(-30%) rotate(225deg) }
+    .dd-menu { position:absolute; z-index:10; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 28px #162e4420; padding:6px }
+    .dd-opt { display:flex; align-items:center; gap:10px; margin:0; padding:10px 12px; border-radius:7px; font-weight:400; cursor:pointer }
+    .dd-opt:hover { background:var(--pale) }
+    .dd-opt:has(input:checked) { background:#dceafa; color:var(--navy); font-weight:700 }
+    .dd-opt input[type=radio] { width:auto; min-height:0; margin:0; padding:0; border:0; accent-color:var(--blue) }
+    .dd-opt:focus-within { outline:3px solid var(--yellow); outline-offset:-3px }
+    .note { color:#5c6b79; font-size:13px; margin:12px 0 0 }
+    .alert { padding:11px 14px; border-radius:7px; margin-bottom:16px }
+    .success { background:#e8f7ee; color:#17623a } .error { background:#fff0ed; color:#9b2c1d }
+    .week-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap }
+    .week-heading h2 { margin:0 } .week-heading p { margin:0; color:#566574 }
+    .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px }
+    table { border-collapse:collapse; width:100%; min-width:860px; background:#fff; font-size:14px }
+    th,td { border:1px solid #25313b; padding:9px 10px; text-align:center }
+    thead tr th { background:#ffc400; color:#111; font-size:17px }
+    th:first-child,td:first-child { text-align:left; font-weight:700; min-width:145px }
+    .day-head { display:block; font-weight:400; font-size:12px; margin-top:3px }
+    .dept-row th { text-align:center; background:#dceafa; color:var(--navy); font-size:15px; padding:8px 11px }
+    .row-label { font-weight:400 !important }
+    .total-row td,.total-row th { background:#f0f4f7; font-weight:700 }
+    .week-total { font-weight:700; background:#fff9d6 }
+    tfoot th,tfoot td { background:#eaf0f5; font-weight:700 }
+    .small { font-size:12px; color:#637282 }
+    .muted { color:#637282 }
+    @media(max-width:800px) { .entry-grid { grid-template-columns:1fr 1fr } .entry-grid .btn-row,.entry-grid > div:has(> button) { grid-column:span 2 } .entry-grid button { width:100% } main { margin-top:16px } .card { padding:16px } }
+    @media(max-width:480px) { .entry-grid { grid-template-columns:1fr } .span-2,.entry-grid .btn-row,.entry-grid > div:has(> button) { grid-column:auto } header h1 { font-size:21px } }
+    @media print { body { background:#fff } header { padding:12px 0; color:#111; background:#fff; border-bottom:2px solid #111 } header p { color:#333 } main { max-width:none; margin:12px 0; padding:0 } .entry-card,.no-print { display:none } .card { box-shadow:none; border:0; padding:0 } .table-wrap { overflow:visible; border:0 } table { min-width:0; font-size:10px } th,td { padding:5px } }
+  </style>
+</head>
+<body>
+<header><h1>Email Inward Count Tracker</h1><p>Daily counts for Design Center, QC and Account · weekly totals calculated automatically</p></header>
+<main>
+  <section class="card entry-card">
+    <h2>Enter or update daily counts</h2>
+    <div id="alert" hidden></div>
+
+    <form id="load-form" class="entry-grid" autocomplete="off">
+      <div><label for="date">Date</label><input type="date" id="date" name="date" required></div>
+      <div>
+        <label id="department-label">User / department</label>
+        <details class="dd" id="department-dd">
+          <summary aria-labelledby="department-label"><span class="dd-value" id="department-value"></span></summary>
+          <div class="dd-menu" role="radiogroup" aria-labelledby="department-label" id="department-options"></div>
+        </details>
+      </div>
+      <div><label for="selected-record">Selected record</label><input id="selected-record" readonly aria-label="Current saved counts"></div>
+      <div><label for="week-view">Report week (Monday–Saturday)</label><input id="week-view" readonly></div>
+      <div class="btn-row"><button type="submit">Load date</button><button type="button" class="btn-secondary" id="today-btn">Today</button></div>
+    </form>
+
+    <form id="save-form" class="entry-grid" style="margin-top:15px">
+      <div><label for="morning_count">Morning (7:30 AM–12:00 PM)</label><input type="number" id="morning_count" name="morning" min="0" step="1" inputmode="numeric" autocomplete="off" required></div>
+      <div><label for="afternoon_count">Afternoon (12:00 PM–5:00 PM)</label><input type="number" id="afternoon_count" name="afternoon" min="0" step="1" inputmode="numeric" autocomplete="off" required></div>
+      <div class="span-2"><label id="saving-to-label">Saving to</label><div class="summary" id="saving-to" aria-labelledby="saving-to-label"></div></div>
+      <div><button type="submit" id="save-btn">Save counts</button></div>
+    </form>
+    <p class="note">Saved records are kept in the database. Re-enter a date and department to correct or update their counts. The weekly report covers Monday through Saturday.</p>
+  </section>
+
+  <section class="card">
+    <div class="week-heading">
+      <div><h2>Weekly inward count</h2><p id="week-heading-text"></p></div>
+      <button type="button" class="no-print" id="print-btn">Print report</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="week-head"></thead>
+        <tbody id="week-body"></tbody>
+        <tfoot id="week-foot"></tfoot>
+      </table>
+    </div>
+    <p class="note">Each date column shows the combined count for that day. The final column is the automatic Monday–Saturday total. Days with no saved entry count as 0.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  var DEPARTMENTS = ['Design Center', 'QC', 'Account'];
+  var SHIFTS = [
+    { key: 'morning', label: '7:30 AM – 12:00 PM' },
+    { key: 'afternoon', label: '12:00 PM – 5:00 PM' }
+  ];
+  var TIMEZONE = 'Asia/Singapore';
+
+  var state = { date: '', department: DEPARTMENTS[0], week: { dates: [], records: {} } };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function todayInSingapore() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  }
+
+  // Formats 'YYYY-MM-DD' parts without relying on the browser timezone.
+  function utcDate(ymd) { return new Date(ymd + 'T00:00:00Z'); }
+  function dmy(ymd) { var p = ymd.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function weekday(ymd, style) { return utcDate(ymd).toLocaleDateString('en-GB', { weekday: style, timeZone: 'UTC' }); }
+  function longDate(ymd) { return utcDate(ymd).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+  function shortDate(ymd) { return utcDate(ymd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); }
+
+  function showAlert(kind, text) {
+    var box = $('alert');
+    box.className = 'alert ' + kind;
+    box.textContent = text;
+    box.hidden = !text;
+  }
+
+  function setBusy(busy) {
+    $('save-btn').disabled = busy;
+    $('load-form').querySelector('button[type=submit]').disabled = busy;
+  }
+
+  function renderDepartments() {
+    var options = $('department-options');
+    options.innerHTML = DEPARTMENTS.map(function (dept) {
+      var checked = dept === state.department ? ' checked' : '';
+      return '<label class="dd-opt"><input type="radio" name="department" value="' + esc(dept) + '"' + checked + '><span>' + esc(dept) + '</span></label>';
+    }).join('');
+    $('department-value').textContent = state.department;
+  }
+
+  function renderEntry(entry) {
+    $('morning_count').value = entry ? entry.morning : '';
+    $('afternoon_count').value = entry ? entry.afternoon : '';
+    $('selected-record').value = entry
+      ? entry.morning + ' morning · ' + entry.afternoon + ' afternoon'
+      : 'No saved entry';
+    $('saving-to').textContent = state.department + ' · ' + weekday(state.date, 'long') + ', ' + dmy(state.date);
+  }
+
+  function count(day, dept, shift) {
+    var rec = state.week.records[day] && state.week.records[day][dept];
+    return rec ? (rec[shift] || 0) : 0;
+  }
+
+  function renderWeek() {
+    var dates = state.week.dates;
+    if (!dates.length) return;
+    var first = dates[0], last = dates[dates.length - 1];
+
+    $('week-view').value = shortDate(first) + ' – ' + shortDate(last);
+    $('week-heading-text').innerHTML = 'Week ending Saturday, ' + esc(longDate(last)) +
+      ' <span class="small">(' + esc(shortDate(first) + ' – ' + shortDate(last)) + ')</span>';
+
+    $('week-head').innerHTML = '<tr><th>Department / shift</th>' +
+      dates.map(function (d) {
+        return '<th>' + dmy(d) + '<span class="day-head">' + weekday(d, 'long') + '</span></th>';
+      }).join('') + '<th>Weekly total</th></tr>';
+
+    var grand = 0;
+    var dayTotals = {};
+    dates.forEach(function (d) { dayTotals[d] = 0; });
+
+    var body = '';
+    DEPARTMENTS.forEach(function (dept) {
+      body += '<tr class="dept-row"><th colspan="' + (dates.length + 2) + '">' + esc(dept) + '</th></tr>';
+      var deptWeekly = 0;
+      SHIFTS.forEach(function (shift) {
+        var rowTotal = 0;
+        body += '<tr><th class="row-label">' + esc(shift.label) + '</th>';
+        dates.forEach(function (d) {
+          var c = count(d, dept, shift.key);
+          rowTotal += c;
+          dayTotals[d] += c;
+          body += '<td>' + c + '</td>';
+        });
+        body += '<td class="week-total">' + rowTotal + '</td></tr>';
+        deptWeekly += rowTotal;
+      });
+      body += '<tr class="total-row"><th>' + esc(dept) + ' daily total</th>';
+      dates.forEach(function (d) {
+        body += '<td>' + (count(d, dept, 'morning') + count(d, dept, 'afternoon')) + '</td>';
+      });
+      body += '<td>' + deptWeekly + '</td></tr>';
+      grand += deptWeekly;
+    });
+    $('week-body').innerHTML = body;
+
+    $('week-foot').innerHTML = '<tr><th>All departments</th>' +
+      dates.map(function (d) { return '<td>' + dayTotals[d] + '</td>'; }).join('') +
+      '<td>' + grand + '</td></tr>';
+  }
+
+  async function loadEntry() {
+    showAlert('', '');
+    setBusy(true);
+    try {
+      var url = '/api/counts?date=' + encodeURIComponent(state.date) + '&department=' + encodeURIComponent(state.department);
+      var res = await fetch(url, { headers: { Accept: 'application/json' } });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load the counts.');
+      state.week = data.week;
+      renderEntry(data.entry);
+      renderWeek();
+      history.replaceState(null, '', '?date=' + encodeURIComponent(state.date) + '&department=' + encodeURIComponent(state.department));
+    } catch (err) {
+      showAlert('error', err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveEntry(event) {
+    event.preventDefault();
+    showAlert('', '');
+    setBusy(true);
+    try {
+      var res = await fetch('/api/counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          date: state.date,
+          department: state.department,
+          morning: $('morning_count').value,
+          afternoon: $('afternoon_count').value
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save the counts.');
+      showAlert('success', 'Counts saved.');
+      await loadEntry();
+    } catch (err) {
+      showAlert('error', err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function setupDepartmentDropdown() {
+    var dd = $('department-dd');
+    dd.addEventListener('change', function (event) {
+      if (event.target.name !== 'department') return;
+      state.department = event.target.value;
+      $('department-value').textContent = state.department;
+      dd.open = false;
+      dd.querySelector('summary').focus();
+      loadEntry();
+    });
+    document.addEventListener('click', function (event) {
+      if (dd.open && !dd.contains(event.target)) dd.open = false;
+    });
+  }
+
+  function init() {
+    var params = new URLSearchParams(location.search);
+    var requested = params.get('date');
+    state.date = /^\d{4}-\d{2}-\d{2}$/.test(requested || '') ? requested : todayInSingapore();
+    if (DEPARTMENTS.indexOf(params.get('department')) !== -1) state.department = params.get('department');
+
+    $('date').value = state.date;
+    renderDepartments();
+    setupDepartmentDropdown();
+
+    $('load-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      state.date = $('date').value || state.date;
+      loadEntry();
+    });
+    $('today-btn').addEventListener('click', function () {
+      state.date = todayInSingapore();
+      $('date').value = state.date;
+      loadEntry();
+    });
+    $('save-form').addEventListener('submit', saveEntry);
+    $('print-btn').addEventListener('click', function () { window.print(); });
+
+    loadEntry();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

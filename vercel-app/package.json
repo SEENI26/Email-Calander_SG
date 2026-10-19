@@ -1,0 +1,10 @@
+{
+  "name": "email-inward-count-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily email inward counts for Design Center, QC and Account, stored in Vercel Postgres.",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  }
+}
